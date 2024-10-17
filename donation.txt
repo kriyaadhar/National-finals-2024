@@ -1,0 +1,823 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { ethers } from 'ethers'
+
+const contractABI = [
+    [
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_owner",
+                    "type": "address"
+                },
+                {
+                    "internalType": "string",
+                    "name": "_title",
+                    "type": "string"
+                },
+                {
+                    "internalType": "string",
+                    "name": "_description",
+                    "type": "string"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_target",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_deadline",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "string",
+                    "name": "_image",
+                    "type": "string"
+                }
+            ],
+            "name": "createCampaign",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "donateToCampaign",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "name": "campaigns",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                },
+                {
+                    "internalType": "string",
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "internalType": "string",
+                    "name": "description",
+                    "type": "string"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "target",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "deadline",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "amountCollected",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "string",
+                    "name": "image",
+                    "type": "string"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "getCampaigns",
+            "outputs": [
+                {
+                    "components": [
+                        {
+                            "internalType": "address",
+                            "name": "owner",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "title",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "description",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "target",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "deadline",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amountCollected",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "image",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "address[]",
+                            "name": "donators",
+                            "type": "address[]"
+                        },
+                        {
+                            "internalType": "uint256[]",
+                            "name": "donations",
+                            "type": "uint256[]"
+                        }
+                    ],
+                    "internalType": "struct CrowdFunding.Campaign[]",
+                    "name": "",
+                    "type": "tuple[]"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "getDonators",
+            "outputs": [
+                {
+                    "internalType": "address[]",
+                    "name": "",
+                    "type": "address[]"
+                },
+                {
+                    "internalType": "uint256[]",
+                    "name": "",
+                    "type": "uint256[]"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "numberOfCampaigns",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ]
+]
+
+const contractAddress = "0x5FD6eB55D12E759a21C09eF703fe0CBa1DC9d88D"
+
+export default function CrowdFunding() {
+  const [provider, setProvider] = useState(null)
+  const [contract, setContract] = useState(null)
+  const [campaigns, setCampaigns] = useState([])
+  const [newCampaign, setNewCampaign] = useState({
+    title: '',
+    description: '',
+    target: '',
+    deadline: '',
+    image: ''
+  })
+  const [donationAmount, setDonationAmount] = useState('')
+  const [selectedCampaign, setSelectedCampaign] = useState(null)
+
+  useEffect(() => {
+    const init = async () => {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' })
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          setProvider(provider)
+          const signer = await provider.getSigner()
+          const crowdFundingContract = new ethers.Contract(contractAddress, contractABI, signer)
+          setContract(crowdFundingContract)
+          await loadCampaigns(crowdFundingContract)
+        } catch (error) {
+          console.error('Error initializing dApp:', error)
+        }
+      } else {
+        console.log('Please install MetaMask!')
+      }
+    }
+    init()
+  }, [])
+
+  const loadCampaigns = async (contractInstance) => {
+    try {
+      const allCampaigns = await contractInstance.getCampaigns()
+      setCampaigns(allCampaigns)
+    } catch (error) {
+      console.error('Error loading campaigns:', error)
+    }
+  }
+
+  const handleCreateCampaign = async (e) => {
+    e.preventDefault()
+    if (!contract || !provider) return
+    try {
+      const signer = await provider.getSigner()
+      const address = await signer.getAddress()
+      const tx = await contract.createCampaign(
+        address,
+        newCampaign.title,
+        newCampaign.description,
+        ethers.parseEther(newCampaign.target),
+        Math.floor(new Date(newCampaign.deadline).getTime() / 1000),
+        newCampaign.image
+      )
+      await tx.wait()
+      await loadCampaigns(contract)
+      setNewCampaign({ title: '', description: '', target: '', deadline: '', image: '' })
+    } catch (error) {
+      console.error('Error creating campaign:', error)
+    }
+  }
+
+  const handleDonate = async (e) => {
+    e.preventDefault()
+    if (!contract || selectedCampaign === null) return
+    try {
+      const tx = await contract.donateToCampaign(selectedCampaign, {
+        value: ethers.parseEther(donationAmount)
+      })
+      await tx.wait()
+      await loadCampaigns(contract)
+      setDonationAmount('')
+      setSelectedCampaign(null)
+    } catch (error) {
+      console.error('Error donating:', error)
+    }
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">CrowdFunding DApp</h1>
+      
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+        <h2 className="text-2xl font-bold mb-4">Create New Campaign</h2>
+        <form onSubmit={handleCreateCampaign} className="space-y-4">
+          <div>
+            <label htmlFor="title" className="block text-gray-700 text-sm font-bold mb-2">Title</label>
+            <input
+              id="title"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={newCampaign.title}
+              onChange={(e) => setNewCampaign({ ...newCampaign, title: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="description" className="block text-gray-700 text-sm font-bold mb-2">Description</label>
+            <textarea
+              id="description"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={newCampaign.description}
+              onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="target" className="block text-gray-700 text-sm font-bold mb-2">Target Amount (ETH)</label>
+            <input
+              id="target"
+              type="number"
+              step="0.01"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={newCampaign.target}
+              onChange={(e) => setNewCampaign({ ...newCampaign, target: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="deadline" className="block text-gray-700 text-sm font-bold mb-2">Deadline</label>
+            <input
+              id="deadline"
+              type="date"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={newCampaign.deadline}
+              onChange={(e) => setNewCampaign({ ...newCampaign, deadline: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="image" className="block text-gray-700 text-sm font-bold mb-2">Image URL</label>
+            <input
+              id="image"
+              type="url"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={newCampaign.image}
+              onChange={(e) => setNewCampaign({ ...newCampaign, image: e.target.value })}
+              required
+            />
+          </div>
+          <button type="submit" className="bg-black hover:bg-blue-900 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            Create Campaign
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+        <h2 className="text-2xl font-bold mb-4">Donate to a Campaign</h2>
+        <form onSubmit={handleDonate} className="space-y-4">
+          <div>
+            <label htmlFor="campaignId" className="block text-gray-700 text-sm font-bold mb-2">Campaign ID</label>
+            <input
+              id="campaignId"
+              type="number"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={selectedCampaign || ''}
+              onChange={(e) => setSelectedCampaign(Number(e.target.value))}
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="donationAmount" className="block text-gray-700 text-sm font-bold mb-2">Donation Amount (ETH)</label>
+            <input
+              id="donationAmount"
+              type="number"
+              step="0.01"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={donationAmount}
+              onChange={(e) => setDonationAmount(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="bg-black hover:bg-green-900 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            Donate
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+        <h2 className="text-2xl font-bold mb-4">Active Campaigns</h2>
+        <div className="space-y-4">
+          {campaigns.map((campaign, index) => (
+            <div key={index} className="border rounded p-4">
+              <h3 className="text-lg font-semibold">{campaign.title}</h3>
+              <p className="text-sm text-gray-600 mb-2">{campaign.description}</p>
+              <img src={campaign.image} alt={campaign.title} className="w-full h-40 object-cover mb-2" />
+              <p>Target: {ethers.formatEther(campaign.target)} ETH</p>
+              <p>Collected: {ethers.formatEther(campaign.amountCollected)} ETH</p>
+              <p>Deadline: {new Date(Number(campaign.deadline) * 1000).toLocaleDateString()}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+
+
+
+
+'use client'
+
+import { useState, useEffect } from 'react';
+import { ethers, BrowserProvider } from 'ethers';
+
+const contractABI = [
+    [
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "id",
+                    "type": "uint256"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "address",
+                    "name": "creator",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "goal",
+                    "type": "uint256"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint32",
+                    "name": "startAt",
+                    "type": "uint32"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint32",
+                    "name": "endAt",
+                    "type": "uint32"
+                }
+            ],
+            "name": "CampaignCreated",
+            "type": "event"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "claim",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "Claim",
+            "type": "event"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_goal",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint32",
+                    "name": "_startAt",
+                    "type": "uint32"
+                },
+                {
+                    "internalType": "uint32",
+                    "name": "_endAt",
+                    "type": "uint32"
+                }
+            ],
+            "name": "createCampaign",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_id",
+                    "type": "uint256"
+                }
+            ],
+            "name": "pledge",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "id",
+                    "type": "uint256"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "address",
+                    "name": "pledger",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "amount",
+                    "type": "uint256"
+                }
+            ],
+            "name": "PledgeCreated",
+            "type": "event"
+        },
+        {
+            "inputs": [],
+            "name": "campaignCount",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "name": "campaigns",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "creator",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "goal",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "pledged",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint32",
+                    "name": "startAt",
+                    "type": "uint32"
+                },
+                {
+                    "internalType": "uint32",
+                    "name": "endAt",
+                    "type": "uint32"
+                },
+                {
+                    "internalType": "bool",
+                    "name": "claimed",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "name": "pledgedAmount",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ]
+]
+
+const contractAddress = "0x9d83e140330758a8fFD07F8Bd73e86ebcA8a5692"
+
+export default function CrowdfundingDApp() {
+    const [provider, setProvider] = useState(null)
+    const [signer, setSigner] = useState(null)    
+    const [contract, setContract] = useState(null)
+    const [campaigns, setCampaigns] = useState([])
+    const [newCampaign, setNewCampaign] = useState({ goal: '', startAt: '', endAt: '' })
+    const [pledgeAmount, setPledgeAmount] = useState('')
+    const [selectedCampaign, setSelectedCampaign] = useState(null)
+
+    useEffect(() => {
+        const init = async () => {
+            if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
+                try {
+                    // Request account access
+                    await window.ethereum.request({ method: 'eth_requestAccounts' })
+                    const browserProvider = new BrowserProvider(window.ethereum)
+                    setProvider(browserProvider)
+                    const signerInstance = await browserProvider.getSigner()
+                    setSigner(signerInstance)
+                    const crowdfundingContract = new ethers.Contract(contractAddress, contractABI, signerInstance)
+                    setContract(crowdfundingContract)
+                    await loadCampaigns(crowdfundingContract)
+                } catch (error) {
+                    console.error('Error initializing dApp:', error)
+                }
+            } else {
+                console.log('Please install MetaMask!')
+            }
+        }
+        init()
+    }, [])
+
+    const loadCampaigns = async (contractInstance) => {
+        try {
+            const campaignCount = await contractInstance.campaignCount()
+            const loadedCampaigns = []
+            for (let i = 1; i <= campaignCount.toNumber(); i++) {
+                const campaign = await contractInstance.campaigns(i)
+                loadedCampaigns.push({ id: i, ...campaign })
+            }
+            setCampaigns(loadedCampaigns)
+        } catch (error) {
+            console.error('Error loading campaigns:', error)
+        }
+    }
+
+    const handleCreateCampaign = async (e) => {
+        e.preventDefault()
+        if (!contract) return
+        try {
+            const tx = await contract.createCampaign(
+                ethers.parseEther(newCampaign.goal),
+                Math.floor(new Date(newCampaign.startAt).getTime() / 1000),
+                Math.floor(new Date(newCampaign.endAt).getTime() / 1000)
+            )
+            await tx.wait()
+            await loadCampaigns(contract)
+            setNewCampaign({ goal: '', startAt: '', endAt: '' })
+        } catch (error) {
+            console.error('Error creating campaign:', error)
+        }
+    }
+
+    const handlePledge = async (e) => {
+        e.preventDefault()
+        if (!contract || selectedCampaign === null) return
+        try {
+            const tx = await contract.pledge(selectedCampaign, { value: ethers.parseEther(pledgeAmount) })
+            await tx.wait()
+            await loadCampaigns(contract)
+            setPledgeAmount('')
+            setSelectedCampaign(null)
+        } catch (error) {
+            console.error('Error pledging:', error)
+        }
+    }
+
+    return (
+        <div className="container mx-auto p-4">
+            <h1 className="text-3xl font-bold mb-6">Web3 Crowdfunding DApp</h1>
+            
+            {/* Create New Campaign Section */}
+            <div className="card mb-6 p-6 border rounded">
+                <h2 className="text-2xl font-semibold mb-4">Create New Campaign</h2>
+                <p className="mb-4">Start a new crowdfunding campaign</p>
+                <form onSubmit={handleCreateCampaign} className="space-y-4">
+                    <div className="space-y-2">
+                        <label htmlFor="goal" className="font-semibold">Goal (ETH)</label>
+                        <input
+                            id="goal"
+                            type="number"
+                            value={newCampaign.goal}
+                            onChange={(e) => setNewCampaign({ ...newCampaign, goal: e.target.value })}
+                            required
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="startAt" className="font-semibold">Start Date</label>
+                        <input
+                            id="startAt"
+                            type="datetime-local"
+                            value={newCampaign.startAt}
+                            onChange={(e) => setNewCampaign({ ...newCampaign, startAt: e.target.value })}
+                            required
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="endAt" className="font-semibold">End Date</label>
+                        <input
+                            id="endAt"
+                            type="datetime-local"
+                            value={newCampaign.endAt}
+                            onChange={(e) => setNewCampaign({ ...newCampaign, endAt: e.target.value })}
+                            required
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <button type="submit" className="w-full py-2 bg-black text-white rounded hover:bg-blue-500">Create Campaign</button>
+                </form>
+            </div>
+
+            {/* Pledge to a Campaign Section */}
+            <div className="card mb-6 p-6 border rounded">
+                <h2 className="text-2xl font-semibold mb-4">Pledge to a Campaign</h2>
+                <p className="mb-4">Support an existing campaign</p>
+                <form onSubmit={handlePledge} className="space-y-4">
+                    <div className="space-y-2">
+                        <label htmlFor="campaignId" className="font-semibold">Campaign ID</label>
+                        <input
+                            id="campaignId"
+                            type="number"
+                            value={selectedCampaign || ''}
+                            onChange={(e) => setSelectedCampaign(Number(e.target.value))}
+                            required
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="pledgeAmount" className="font-semibold">Pledge Amount (ETH)</label>
+                        <input
+                            id="pledgeAmount"
+                            type="number"
+                            value={pledgeAmount}
+                            onChange={(e) => setPledgeAmount(e.target.value)}
+                            required
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                    <button type="submit" className="w-full py-2 bg-black text-white rounded hover:bg-green-600">Pledge</button>
+                </form>
+            </div>
+
+            {/* Campaigns List */}
+<h2 className="text-2xl font-semibold mb-4">Active Campaigns</h2>
+<div className="grid grid-cols-1 gap-4">
+  {campaigns.map((campaign) => (
+    <div key={campaign.id} className="card p-4 border rounded">
+      <h3 className="text-xl font-bold mb-2">Campaign {campaign.id}</h3>
+      <p>Goal: {ethers.formatEther(campaign.goal)} ETH</p>
+      <p>Pledged: {ethers.formatEther(campaign.pledged)} ETH</p>
+      
+      {/* Show Individual Pledge for Current User */}
+      <button
+        onClick={() => handlePledge(campaign.id)}
+        className="mt-2 bg-black text-white p-2 rounded"
+      >
+        Check My Pledge
+      </button>
+
+      <button
+        onClick={() => setSelectedCampaign(campaign.id)}
+        className="mt-2 bg-green-500 text-white p-2 rounded"
+      >
+        Pledge to Campaign
+      </button>
+    </div>
+  ))}
+</div>
+        </div>
+    )
+}
+
+
+

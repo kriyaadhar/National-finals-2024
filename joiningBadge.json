@@ -1,0 +1,16 @@
+{
+    "name": "EduBlockAI Joining Badge",
+    "description": "This badge is awarded for joining EduBlockAI -> Empowering Decentralized Learning",
+    "image": "QmVXTNNV6QvNqYxcb9UcDoyYdkBsvjzn7qeU6j25F6mUyo",  
+    "attributes": [
+      {
+        "trait_type": "Rarity",
+        "value": "Common"
+      },
+      {
+        "trait_type": "Achievement",
+        "value": "Joined EduBlockAI"
+      }
+    ]
+  }
+  
